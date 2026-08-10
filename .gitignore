@@ -1,0 +1,9 @@
+node_modules/
+dist/
+.vite/
+.DS_Store
+*.log
+npm-debug.log*
+
+# Screenshot harness scratch output (committed shots live in docs/screenshots/)
+/tmp-shots/

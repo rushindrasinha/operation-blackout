@@ -1,0 +1,15 @@
+import { chromium } from 'playwright';
+const PORT = process.env.PORT || 5312;
+const EXPR = process.argv[2];
+const browser = await chromium.launch({ args: ['--use-angle=metal', '--ignore-gpu-blocklist', '--use-gl=angle'] });
+const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
+const errs = [];
+page.on('pageerror', (e) => errs.push(e.message));
+page.on('console', (m) => { if (m.type() === 'error') errs.push(m.text()); });
+await page.goto(`http://127.0.0.1:${PORT}/`, { waitUntil: 'domcontentloaded' });
+await page.waitForFunction(() => window.__READY__ === true, { timeout: 40000 }).catch(() => errs.push('never ready'));
+await new Promise((r) => setTimeout(r, 1500));
+const out = await page.evaluate(EXPR);
+console.log(JSON.stringify(out, null, 1));
+if (errs.length) console.log('ERRORS:', errs.slice(0, 10));
+await browser.close();

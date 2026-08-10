@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+<title>OPERATION BLACKOUT</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  html, body { width:100%; height:100%; overflow:hidden; background:#000; }
+  body { font-family: "Barlow Condensed", "Helvetica Neue", Arial, sans-serif; }
+  #app { position:fixed; inset:0; }
+  canvas { display:block; width:100%; height:100%; }
+
+  /* Boot / loading veil */
+  #boot {
+    position:fixed; inset:0; z-index:100;
+    background:#07090b;
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    color:#c8ccd0; letter-spacing:.35em; text-transform:uppercase;
+    transition:opacity .8s ease; font-size:13px;
+  }
+  #boot.hidden { opacity:0; pointer-events:none; }
+  #boot .title { font-size:38px; font-weight:700; letter-spacing:.22em; color:#e8e4dc; margin-bottom:28px; }
+  #boot .bar { width:320px; height:2px; background:#1c2126; position:relative; overflow:hidden; }
+  #boot .bar i { position:absolute; inset:0; width:0%; background:#c8a24a; transition:width .25s ease; }
+  #boot .status { margin-top:14px; font-size:11px; color:#5d666e; letter-spacing:.3em; }
+
+  /* Click-to-play */
+  #enter {
+    position:fixed; inset:0; z-index:90; display:none;
+    align-items:center; justify-content:center; flex-direction:column;
+    background:rgba(4,6,8,.72); backdrop-filter:blur(3px);
+    color:#e8e4dc; cursor:pointer; letter-spacing:.3em; text-transform:uppercase;
+  }
+  #enter.show { display:flex; }
+  #enter .k { font-size:15px; border:1px solid #2c3238; padding:16px 34px; }
+  #enter .hint { margin-top:22px; font-size:10px; color:#6c757d; letter-spacing:.22em; line-height:2; text-align:center; }
+</style>
+</head>
+<body>
+  <div id="app"></div>
+
+  <div id="boot">
+    <div class="title">Operation Blackout</div>
+    <div class="bar"><i id="boot-bar"></i></div>
+    <div class="status" id="boot-status">Initialising</div>
+  </div>
+
+  <div id="enter">
+    <div class="k">Click to Deploy</div>
+    <div class="hint">
+      WASD move &nbsp;·&nbsp; Shift sprint &nbsp;·&nbsp; Ctrl crouch &nbsp;·&nbsp; Space jump<br/>
+      Left fire &nbsp;·&nbsp; Right ADS &nbsp;·&nbsp; R reload &nbsp;·&nbsp; 1/2 weapon &nbsp;·&nbsp; Esc release cursor
+    </div>
+  </div>
+
+  <script type="module" src="/src/main.js"></script>
+</body>
+</html>

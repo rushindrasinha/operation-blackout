@@ -1,0 +1,31 @@
+{
+  "name": "operation-blackout",
+  "version": "1.0.0",
+  "private": true,
+  "description": "A contemporary-military first-person shooter built entirely in Three.js, with every texture, mesh and sound generated procedurally in code — no external assets.",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "shoot": "node tools/shoot.mjs",
+    "shoot:all": "for p in spawn overwatch warehouse lane closeup; do node tools/shoot.mjs --out docs/screenshots/$p.png --wait 32000 --pose $p; done"
+  },
+  "keywords": [
+    "threejs",
+    "webgl",
+    "fps",
+    "procedural-generation",
+    "pbr",
+    "game"
+  ],
+  "license": "UNLICENSED",
+  "dependencies": {
+    "@dimforge/rapier3d-compat": "^0.19.3",
+    "three": "^0.185.1"
+  },
+  "devDependencies": {
+    "playwright": "^1.58.0",
+    "vite": "^8.1.5"
+  }
+}
