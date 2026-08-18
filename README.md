@@ -13,6 +13,7 @@ on a machine with no network connection.
 
 ## Table of contents
 
+- [Handoff notes](HANDOFF.md) — start here if you are picking this up cold
 - [Quick start](#quick-start)
 - [Screenshots](#screenshots)
 - [What this actually is](#what-this-actually-is)
