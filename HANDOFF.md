@@ -63,7 +63,18 @@ Also: `roughnessMap`, `metalnessMap` and `aoMap` all point at the **same packed 
 The render system composites **only** `ctx.scene` and `ctx.viewmodelScene`. Anything drawn
 through a third `THREE.Scene` will silently never appear.
 
-### 4. Rapier colliders are invisible to raycasts until the next `step()`
+### 4. Never let a non-finite float reach Rapier
+One NaN in a position, velocity or impulse panics Rust inside `world.step()`. The panic
+unwinds out of wasm still holding the World's borrow, so **every later Rapier call throws
+forever** — the game keeps rendering at full framerate while bullets stop registering and
+bots go blind. Use the safe setters (`physics.setLinvel` / `setAngvel` / `applyImpulse` /
+`setTranslation`), never the raw body methods.
+
+Watch for guards that cannot catch what they guard against: `NaN > 16` is `false` and
+`Math.max(1e-3, NaN)` is `NaN`, so magnitude tests and clamps both let NaN through. Test
+`Number.isFinite` explicitly. Verify with `npm run test:physics`.
+
+### 5. Rapier colliders are invisible to raycasts until the next `step()`
 Rapier only rebuilds query structures inside `world.step()`. Spawn, wait a tick, then
 raycast. Also `addCapsule(halfHeight, radius)` — `halfHeight` **excludes** the caps, so total
 height is `2 * (halfHeight + radius)`.

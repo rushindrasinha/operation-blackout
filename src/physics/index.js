@@ -7,6 +7,57 @@ import { PhysicsDebugView } from './debugview.js';
 
 export { GROUPS, FILTERS, encodeGroups };
 
+// ───────────────────────────────────────────────────────────────────────────
+// Finite guards.
+//
+// A single non-finite float reaching Rapier panics the Rust side inside
+// world.step() ("RuntimeError: unreachable"). That panic unwinds out of wasm
+// with the World still mutably borrowed, so wasm-bindgen's RefCell is left
+// locked and EVERY subsequent Rapier call — raycasts, body creation, the
+// character controller — throws "recursive use of an object detected which
+// would lead to unsafe aliasing in rust" for the rest of the session.
+//
+// Observed live: one bad velocity killed physics 66s into a session and
+// produced 13,445 identical raycast failures while the game kept rendering.
+// Bullets stopped registering and bots went blind, with no visible crash.
+//
+// Note the two traps that let NaN through code that looks like it guards:
+//   Math.max(1e-3, NaN) === NaN     — clamping does not sanitise
+//   NaN > 16 === false              — a magnitude test silently skips
+// So these helpers test finiteness explicitly rather than relying on compare.
+// ───────────────────────────────────────────────────────────────────────────
+
+/** Finite number or fallback. Catches NaN and ±Infinity, unlike `??`. */
+export function fnum(v, fallback = 0) {
+  return Number.isFinite(v) ? v : fallback;
+}
+
+/** True only if every component of a vec3-like is finite. */
+export function isFiniteVec3(v) {
+  return !!v && Number.isFinite(v.x) && Number.isFinite(v.y) && Number.isFinite(v.z);
+}
+
+/** Sanitise a vec3-like into a plain {x,y,z}, clamped to a sane magnitude. */
+export function safeVec3(v, fallback = 0, maxMag = 1e4) {
+  let x = fnum(v?.x, fallback), y = fnum(v?.y, fallback), z = fnum(v?.z, fallback);
+  const m = Math.sqrt(x * x + y * y + z * z);
+  if (m > maxMag) { const k = maxMag / m; x *= k; y *= k; z *= k; }
+  return { x, y, z };
+}
+
+/** Sanitise a quaternion-like; falls back to identity and always renormalises. */
+export function safeQuat(q) {
+  const x = fnum(q?.x, 0), y = fnum(q?.y, 0), z = fnum(q?.z, 0), w = fnum(q?.w, 1);
+  const m = Math.sqrt(x * x + y * y + z * z + w * w);
+  if (!(m > 1e-6)) return { x: 0, y: 0, z: 0, w: 1 };
+  return { x: x / m, y: y / m, z: z / m, w: w / m };
+}
+
+/** Positive finite extent, for collider half-sizes. */
+export function safeExtent(v, fallback = 0.1) {
+  return Number.isFinite(v) && v > 1e-4 ? v : fallback;
+}
+
 /**
  * OPERATION BLACKOUT — physics layer.
  *
@@ -34,6 +85,8 @@ export class PhysicsSystem {
     /** @type {RAPIER.World|null} */
     this.world = null;
     this.ready = false;
+    /** Latched true if the Rapier world becomes permanently unusable. */
+    this.dead = false;
 
     this.GROUPS = GROUPS;
     this.FILTERS = FILTERS;
@@ -325,10 +378,16 @@ export class PhysicsSystem {
     else if (type === 'kinematic' || type === 'kinematicPosition') desc = RAPIER.RigidBodyDesc.kinematicPositionBased();
     else desc = RAPIER.RigidBodyDesc.dynamic();
 
-    if (pos) desc.setTranslation(pos.x ?? 0, pos.y ?? 0, pos.z ?? 0);
-    if (quat) desc.setRotation({ x: quat.x ?? 0, y: quat.y ?? 0, z: quat.z ?? 0, w: quat.w ?? 1 });
-    if (opts.linearDamping !== undefined) desc.setLinearDamping(opts.linearDamping);
-    if (opts.angularDamping !== undefined) desc.setAngularDamping(opts.angularDamping);
+    // `??` only catches null/undefined — a NaN coordinate would pass straight
+    // through and panic the solver on the next step. Test finiteness instead.
+    if (pos) {
+      if (!isFiniteVec3(pos)) this._reportNonFinite('_makeBody position', pos);
+      const p = safeVec3(pos);
+      desc.setTranslation(p.x, p.y, p.z);
+    }
+    if (quat) desc.setRotation(safeQuat(quat));
+    if (opts.linearDamping !== undefined) desc.setLinearDamping(fnum(opts.linearDamping, 0));
+    if (opts.angularDamping !== undefined) desc.setAngularDamping(fnum(opts.angularDamping, 0));
     if (opts.ccd) desc.setCcdEnabled(true);
     if (opts.canSleep === false) desc.setCanSleep(false);
     if (opts.gravityScale !== undefined && desc.setGravityScale) desc.setGravityScale(opts.gravityScale);
@@ -365,8 +424,9 @@ export class PhysicsSystem {
       const sy = Array.isArray(size) ? size[1] : (size?.y ?? 1);
       const sz = Array.isArray(size) ? size[2] : (size?.z ?? 1);
       const body = this._makeBody(opts, pos, quat);
+      // Math.max(1e-3, NaN) is NaN — clamping does not sanitise. safeExtent does.
       const desc = RAPIER.ColliderDesc.cuboid(
-        Math.max(1e-3, sx * 0.5), Math.max(1e-3, sy * 0.5), Math.max(1e-3, sz * 0.5),
+        safeExtent(sx * 0.5), safeExtent(sy * 0.5), safeExtent(sz * 0.5),
       );
       const collider = this._finishCollider(desc, body, opts, opts.type === 'dynamic' ? 'DEBRIS' : 'WORLD');
       if (opts.mesh) this.track(body, opts.mesh);
@@ -533,7 +593,7 @@ export class PhysicsSystem {
    *            actor:any, material:string}|null}
    */
   raycast(origin, dir, maxDist = 1000, filter = null) {
-    if (!this.world || !origin || !dir) return null;
+    if (!this.world || this.dead || !origin || !dir) return null;
     if (this._queryDirty) this._syncQueries();
 
     let f = filter;
@@ -578,7 +638,13 @@ export class PhysicsSystem {
         predicate,
       );
     } catch (err) {
-      console.warn('[physics] raycast failed:', err);
+      // Latch-and-silence. The original incident logged this 13,445 times in one
+      // session; once the world is poisoned every call fails and the noise is
+      // both useless and expensive.
+      if (this._isPoisonError(err)) this._markDead('raycast', err);
+      else if ((this.stats.raycastErrors = (this.stats.raycastErrors ?? 0) + 1) <= 5) {
+        console.warn('[physics] raycast failed:', err);
+      }
       return null;
     }
     if (!hit) return null;
@@ -809,11 +875,110 @@ export class PhysicsSystem {
    * call this from anywhere else, and never with a variable dt.
    */
   step(dt) {
-    if (!this.world) return;
+    if (!this.world || this.dead) return;
     if (dt > 0 && Math.abs(this.world.timestep - dt) > 1e-9) this.world.timestep = dt;
     this.world.step();
     this._stepCount++;
     this._queryDirty = false;
+  }
+
+  /**
+   * A wasm-bindgen borrow error means the World is permanently unusable: a Rust
+   * panic escaped a previous call without releasing the RefCell, and nothing on
+   * the JS side can unlock it. Latch it once instead of retrying forever — the
+   * original incident logged 13,445 identical failures in one session, which is
+   * both useless noise and a real frame cost.
+   */
+  _isPoisonError(err) {
+    const m = String(err?.message ?? err);
+    return m.includes('recursive use of an object') || m.includes('unsafe aliasing');
+  }
+
+  _markDead(reason, err) {
+    if (this.dead) return;
+    this.dead = true;
+    this.ready = false;
+    console.error(
+      `[physics] SIMULATION DEAD (${reason}). The Rapier world is permanently ` +
+      'unusable: a Rust panic escaped wasm without releasing its borrow, so every ' +
+      'later call throws. Raycasts, hit registration and AI perception are now ' +
+      'non-functional. This is almost always a non-finite value reaching the solver.',
+      err,
+    );
+    try { this.ctx.events?.emit('physics:dead', { reason, error: String(err?.message ?? err) }); } catch { /* noop */ }
+  }
+
+  /** Warn once per site about non-finite input rather than spamming every frame. */
+  _reportNonFinite(site, value) {
+    this._nonFiniteSites ||= new Set();
+    this.stats.nonFinite = (this.stats.nonFinite ?? 0) + 1;
+    if (this._nonFiniteSites.has(site)) return;
+    this._nonFiniteSites.add(site);
+    console.warn(
+      `[physics] non-finite value rejected at ${site} —`, value,
+      '(sanitised; left unguarded this would panic the solver and kill physics)',
+    );
+  }
+
+  /** Safe linear-velocity write. Use instead of body.setLinvel(). */
+  setLinvel(body, v, wake = true) {
+    if (!body || this.dead) return;
+    if (!isFiniteVec3(v)) this._reportNonFinite('setLinvel', v);
+    try { body.setLinvel(safeVec3(v, 0, 500), wake); } catch (err) { this._guard(err, 'setLinvel'); }
+  }
+
+  /** Safe angular-velocity write. Use instead of body.setAngvel(). */
+  setAngvel(body, v, wake = true) {
+    if (!body || this.dead) return;
+    if (!isFiniteVec3(v)) this._reportNonFinite('setAngvel', v);
+    try { body.setAngvel(safeVec3(v, 0, 200), wake); } catch (err) { this._guard(err, 'setAngvel'); }
+  }
+
+  /** Safe impulse. Use instead of body.applyImpulse(). */
+  applyImpulse(body, v, wake = true) {
+    if (!body || this.dead) return;
+    if (!isFiniteVec3(v)) this._reportNonFinite('applyImpulse', v);
+    try { body.applyImpulse(safeVec3(v, 0, 1e3), wake); } catch (err) { this._guard(err, 'applyImpulse'); }
+  }
+
+  /** Safe teleport. Use instead of body.setTranslation(). */
+  setTranslation(body, p, wake = true) {
+    if (!body || this.dead) return;
+    if (!isFiniteVec3(p)) this._reportNonFinite('setTranslation', p);
+    try { body.setTranslation(safeVec3(p), wake); } catch (err) { this._guard(err, 'setTranslation'); }
+  }
+
+  _guard(err, site) {
+    if (this._isPoisonError(err)) this._markDead(site, err);
+  }
+
+  /**
+   * Scan every tracked dynamic body for non-finite state and quarantine it.
+   *
+   * This is the backstop: guarding write paths stops the NaN we know about, and
+   * this catches one the solver itself produced. Cheap enough to run every step
+   * because it is a handful of finite checks over bodies we already touch.
+   */
+  _sweepNonFinite() {
+    if (!this.world || this.dead) return 0;
+    let fixed = 0;
+    for (const body of this._bodies) {
+      try {
+        if (!body.isDynamic?.()) continue;
+        const t = body.translation(), lv = body.linvel(), av = body.angvel();
+        const bad = !isFiniteVec3(t) || !isFiniteVec3(lv) || !isFiniteVec3(av)
+          || Math.abs(t.x) > 1e5 || Math.abs(t.y) > 1e5 || Math.abs(t.z) > 1e5;
+        if (!bad) continue;
+        fixed++;
+        // Park it far below the map with zeroed motion rather than deleting it —
+        // pools hold references to these bodies and expect them to stay valid.
+        body.setLinvel({ x: 0, y: 0, z: 0 }, false);
+        body.setAngvel({ x: 0, y: 0, z: 0 }, false);
+        if (!isFiniteVec3(t) || Math.abs(t.y) > 1e5) body.setTranslation({ x: 0, y: -500, z: 0 }, false);
+      } catch { /* body freed mid-iteration */ }
+    }
+    if (fixed) this._reportNonFinite('solver output (swept)', `${fixed} bodies`);
+    return fixed;
   }
 
   /**
@@ -844,10 +1009,23 @@ export class PhysicsSystem {
 
     const t0 = performance.now();
     try {
+      // Quarantine any non-finite body state BEFORE stepping. A single NaN
+      // velocity reaching the solver panics Rust and permanently poisons the
+      // World — prevention is the only cure, because nothing on the JS side can
+      // release the borrow once it is lost.
+      this._sweepNonFinite();
       this.step(fdt);
     } catch (err) {
-      console.error('[physics] world.step threw — pausing simulation:', err);
-      this.ready = false;
+      if (this._isPoisonError(err)) this._markDead('world.step', err);
+      else {
+        console.error('[physics] world.step threw — pausing simulation:', err);
+        // A Rust panic ("unreachable") escaping step() has already lost the
+        // borrow, so the world is dead even though this error does not say so.
+        if (String(err?.message ?? err).includes('unreachable')) {
+          this._markDead('world.step panic (unreachable)', err);
+        }
+        this.ready = false;
+      }
       return;
     }
     this.stats.stepMs = this.stats.stepMs * 0.9 + (performance.now() - t0) * 0.1;

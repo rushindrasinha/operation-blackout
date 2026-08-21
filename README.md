@@ -46,6 +46,7 @@ Requires a WebGL2 browser. Developed and measured on an Apple M4 Pro (Metal 4) i
 npm run build        # production bundle -> dist/
 npm run preview      # serve the built bundle
 npm run shoot        # headless screenshot via Playwright
+npm run test:physics # regression test: NaN injection must not kill the simulation
 ```
 
 ---
@@ -529,7 +530,9 @@ GTAO, SSR, TAA, volumetrics and cascaded shadows over a real physics simulation 
 **Tooling**
 - Headless Chromium refuses pointer lock, and input is gated on `input.locked`, so
   `tools/shoot.mjs` cannot exercise gameplay. Gameplay QA requires driving the page directly
-  with Playwright and calling engine APIs.
+  with Playwright and calling engine APIs. This gap is how a session-killing physics bug
+  survived every automated pass — see `CHANGELOG.md` 1.0.1. `npm run test:physics` now covers
+  the specific failure, but the general gap remains.
 - Viewmodel-vs-wall clipping is untested; `VISUAL_BAR.md` lists it as an instant-fail item,
   so it remains an unverified risk.
 

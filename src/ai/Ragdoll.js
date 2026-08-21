@@ -155,21 +155,29 @@ export class Ragdoll {
     phys._queryDirty = true;
 
     // Carry the last locomotion velocity plus the killing impulse into the corpse.
-    const vel = opts.velocity;
-    const hitDir = opts.hitDir;
-    const hitPower = clamp(opts.hitPower ?? 1, 0, 3);
+    // Everything below crosses into wasm. Validate finiteness at the boundary —
+    // `clamp()` and `??` both let NaN through (NaN fails every comparison, and
+    // `??` only catches null/undefined), and a single NaN here is fatal to the
+    // whole simulation, not just to this corpse.
+    const fin = (n) => (Number.isFinite(n) ? n : 0);
+    const finite3 = (v) => !!v && Number.isFinite(v.x) && Number.isFinite(v.y) && Number.isFinite(v.z);
+
+    const vel = finite3(opts.velocity) ? opts.velocity : null;
+    const hitDir = finite3(opts.hitDir) ? opts.hitDir : null;
+    const hitPower = fin(clamp(fin(opts.hitPower ?? 1), 0, 3));
+
     for (const part of this.parts.values()) {
       try {
-        if (vel) part.body.setLinvel({ x: vel.x * 0.7, y: 0, z: vel.z * 0.7 }, true);
+        if (vel) part.body.setLinvel({ x: fin(vel.x * 0.7), y: 0, z: fin(vel.z * 0.7) }, true);
       } catch { /* noop */ }
     }
     if (hitDir) {
       const target = this.parts.get(opts.headshot ? 'head' : 'torso') ?? this.parts.get('pelvis');
       try {
         target?.body.applyImpulse({
-          x: hitDir.x * 14 * hitPower,
-          y: 3.5 * hitPower,
-          z: hitDir.z * 14 * hitPower,
+          x: fin(hitDir.x * 14 * hitPower),
+          y: fin(3.5 * hitPower),
+          z: fin(hitDir.z * 14 * hitPower),
         }, true);
       } catch { /* noop */ }
     }
@@ -183,17 +191,46 @@ export class Ragdoll {
       .applyQuaternion(_q);
   }
 
-  /** Clamp anything the solver did that looks like the start of an explosion. */
+  /**
+   * Clamp anything the solver did that looks like the start of an explosion.
+   *
+   * The magnitude tests below MUST be preceded by a finiteness check. `NaN > 16`
+   * evaluates to false, so a NaN velocity skipped the clamp entirely and stayed
+   * in the body — and one NaN reaching world.step() panics Rust, which unwinds
+   * out of wasm holding the World's borrow and kills physics for the whole
+   * session (raycasts, hit registration, AI perception, all of it). A clamp that
+   * cannot catch the value it exists to catch is worse than no clamp, because it
+   * reads as protection.
+   */
   clampVelocities() {
+    const finite3 = (v) => !!v && Number.isFinite(v.x) && Number.isFinite(v.y) && Number.isFinite(v.z);
     for (const part of this.parts.values()) {
       const b = part.body;
       try {
         const lv = b.linvel();
-        const s = Math.hypot(lv.x, lv.y, lv.z);
-        if (s > 16) { const k = 16 / s; b.setLinvel({ x: lv.x * k, y: lv.y * k, z: lv.z * k }, false); }
+        if (!finite3(lv)) {
+          b.setLinvel({ x: 0, y: 0, z: 0 }, false);
+        } else {
+          const s = Math.hypot(lv.x, lv.y, lv.z);
+          if (s > 16) { const k = 16 / s; b.setLinvel({ x: lv.x * k, y: lv.y * k, z: lv.z * k }, false); }
+        }
+
         const av = b.angvel();
-        const t = Math.hypot(av.x, av.y, av.z);
-        if (t > 22) { const k = 22 / t; b.setAngvel({ x: av.x * k, y: av.y * k, z: av.z * k }, false); }
+        if (!finite3(av)) {
+          b.setAngvel({ x: 0, y: 0, z: 0 }, false);
+        } else {
+          const t = Math.hypot(av.x, av.y, av.z);
+          if (t > 22) { const k = 22 / t; b.setAngvel({ x: av.x * k, y: av.y * k, z: av.z * k }, false); }
+        }
+
+        // A body that has already diverged in position is unrecoverable —
+        // park it rather than let the solver keep integrating garbage.
+        const p = b.translation();
+        if (!finite3(p) || Math.abs(p.x) > 1e4 || Math.abs(p.y) > 1e4 || Math.abs(p.z) > 1e4) {
+          b.setTranslation({ x: 0, y: -500, z: 0 }, false);
+          b.setLinvel({ x: 0, y: 0, z: 0 }, false);
+          b.setAngvel({ x: 0, y: 0, z: 0 }, false);
+        }
       } catch { /* body already freed */ }
     }
   }

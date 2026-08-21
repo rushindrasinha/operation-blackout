@@ -9,7 +9,8 @@
     "build": "vite build",
     "preview": "vite preview",
     "shoot": "node tools/shoot.mjs",
-    "shoot:all": "for p in spawn overwatch warehouse lane closeup; do node tools/shoot.mjs --out docs/screenshots/$p.png --wait 32000 --pose $p; done"
+    "shoot:all": "for p in spawn overwatch warehouse lane closeup; do node tools/shoot.mjs --out docs/screenshots/$p.png --wait 32000 --pose $p; done",
+    "test:physics": "node tools/test-physics-nan.mjs"
   },
   "keywords": [
     "threejs",

@@ -8,6 +8,55 @@ build phase rather than by calendar release.
 
 ---
 
+## [1.0.1] — 2026-08-21
+
+### Fixed
+
+- **Physics could die permanently mid-session, silently.** Found by actually playing the
+  game for a minute — no automated pass had caught it.
+
+  A single non-finite float reaching Rapier panics the Rust side inside `world.step()`
+  (`RuntimeError: unreachable`). That panic unwinds out of wasm **with the World still
+  mutably borrowed**, so wasm-bindgen's `RefCell` is left locked and every subsequent
+  Rapier call throws `recursive use of an object detected which would lead to unsafe
+  aliasing in rust` for the rest of the session. Observed live: 1 panic → 13,445 raycast
+  failures. The game kept rendering at full framerate while bullets stopped registering,
+  the character controller fell back to raw integration, and bots went blind.
+
+  Two pieces of code that looked like guards but could not catch the value they existed
+  to catch:
+  - `Ragdoll.clampVelocities()` tested `if (s > 16)` on `Math.hypot(...)`. **`NaN > 16` is
+    `false`**, so a NaN velocity skipped the clamp and stayed in the body.
+  - `PhysicsSystem.addBox()` used `Math.max(1e-3, sx * 0.5)`. **`Math.max(1e-3, NaN)` is
+    `NaN`**, so a NaN extent passed straight through.
+  - `_makeBody()` used `pos.x ?? 0`, and `??` only catches `null`/`undefined`, not `NaN`.
+
+  Changes:
+  - Added finite guards at the wasm boundary (`fnum`, `isFiniteVec3`, `safeVec3`,
+    `safeQuat`, `safeExtent`) and applied them in `_makeBody`, `addBox`, and new safe
+    setters `setLinvel` / `setAngvel` / `applyImpulse` / `setTranslation`
+  - Added `_sweepNonFinite()`, run before every step, which quarantines any dynamic body
+    whose position or velocity has diverged — the backstop for a NaN the solver itself
+    produced rather than one we passed in
+  - Fixed the NaN-permeable clamp and impulse path in `src/ai/Ragdoll.js`
+  - Added poison detection: `physics.dead` latches, logs **once** with a plain-language
+    diagnosis, and emits `physics:dead`. Previously the failure repeated 13,445 times,
+    which was its own frame cost
+  - Non-finite rejections warn once per call site instead of every frame
+
+- Regression test added: `npm run test:physics` (`tools/test-physics-nan.mjs`) injects NaN
+  into live dynamic bodies and asserts physics survives. **Verified to fail against the
+  pre-fix tree**, so it genuinely discriminates rather than passing vacuously.
+
+### Notes
+
+- No performance change: 70 / 65 / 62 fps at spawn / warehouse / closeup, matching pre-fix.
+- Two earlier hypotheses were wrong and are recorded here so nobody re-investigates them:
+  the nested headshot-classification raycast in `ballistics.js` is **not** re-entrant
+  (480 shots, 11,336 raycasts, zero failures), and no predicate callback throws.
+
+---
+
 ## [1.0.0] — 2026-08-10
 
 First complete build. Playable single-map arena FPS with bots, running at 59–72 fps at
