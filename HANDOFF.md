@@ -25,7 +25,7 @@ npm run dev            # http://localhost:5173 — click Deploy to lock pointer
 
 ## State as of handoff
 
-Complete and playable. One commit. Nothing in flight, no half-finished work.
+Complete and playable. Three commits. Nothing in flight, no half-finished work.
 
 - **~44,000 lines**, 11 systems, 2 runtime dependencies (`three` r185, `@dimforge/rapier3d-compat`)
 - **59–72 fps** at 1920×1080 on a quiet machine, ~350 draw calls, 4.4M triangles
@@ -33,6 +33,7 @@ Complete and playable. One commit. Nothing in flight, no half-finished work.
 - **Graded 6.2/10 (56/90)** against `VISUAL_BAR.md`, which it fails (needs every axis ≥7;
   geometry and viewmodel sit at 5)
 - Audit clean: no secrets, 0 TODOs, 0 `debugger`, 1 `console.log`, build passes
+- `npm run test:physics` guards the one bug that ever killed a live session (see `CHANGELOG.md` 1.0.1)
 - Verified self-contained: cloned fresh, `npm ci`, built, and ran at 64 fps
 
 ---
