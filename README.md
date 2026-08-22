@@ -146,19 +146,19 @@ other's code.
 
 ```mermaid
 flowchart LR
-    subgraph FOUND [" FOUNDATION "]
+    subgraph FOUND ["FOUNDATION"]
         direction TB
-        M[materials<br/><sub>order 5</sub>] --> L[level<br/><sub>order 8</sub>] --> P[physics<br/><sub>order 10</sub>]
+        M["5 · materials"] --> L["8 · level"] --> P["10 · physics"]
     end
-    subgraph SIM [" SIMULATION "]
+    subgraph SIM ["SIMULATION"]
         direction TB
-        PL[player<br/><sub>20</sub>] --> AI[ai<br/><sub>30</sub>] --> W[weapons<br/><sub>40</sub>]
+        PL["20 · player"] --> AI["30 · ai"] --> W["40 · weapons"]
     end
-    subgraph PRES [" PRESENTATION "]
+    subgraph PRES ["PRESENTATION"]
         direction TB
-        FX[fx<br/><sub>50</sub>] --> A[audio<br/><sub>60</sub>] --> LI[lighting<br/><sub>70</sub>] --> H[hud<br/><sub>80</sub>]
+        FX["50 · fx"] --> A["60 · audio"] --> LI["70 · lighting"] --> H["80 · hud"]
     end
-    FOUND --> SIM --> PRES --> R[render<br/><sub>order 90</sub><br/>owns the frame]
+    FOUND --> SIM --> PRES --> R["90 · render"]
 ```
 
 Update order is meaningful: a system may assume everything with a **lower order** is
@@ -204,16 +204,24 @@ shaders.
 
 ```mermaid
 flowchart TD
-    G["G-buffer / MRT<br/><sub>colour · normal · depth · velocity</sub>"] --> AO["GTAO<br/><sub>half-res, bilateral upsample</sub>"]
-    AO --> CS["Contact shadows<br/><sub>raymarch on the DIRECT sun term</sub>"]
-    CS --> SSR["SSR<br/><sub>binary-search refine, roughness-aware</sub>"]
-    SSR --> TAA["TAA<br/><sub>Halton jitter · YCoCg clipping</sub>"]
-    TAA --> VOL["Volumetrics<br/><sub>raymarched sun shafts</sub>"]
-    VOL --> MB["Motion blur"] --> BL["Bloom<br/><sub>dual-filter mip chain</sub>"]
-    BL --> VM["Viewmodel composite<br/><sub>55° FOV, before tonemap</sub>"]
-    VM --> TM["AgX tonemap + filmic grade"]
-    TM --> FIN["Grain · edge CA · vignette"]
+    G["G-buffer / MRT"] --> AO["GTAO"] --> CS["Contact shadows"]
+    CS --> SSR["SSR"] --> TAA["TAA"] --> VOL["Volumetrics"]
+    VOL --> MB["Motion blur"] --> BL["Bloom"]
+    BL --> VM["Viewmodel composite"] --> TM["AgX tonemap + grade"]
+    TM --> FIN["Grain / CA / vignette"]
 ```
+
+| Stage | What it does |
+|:--|:--|
+| **G-buffer / MRT** | colour · normal · depth · velocity into half-float targets |
+| **GTAO** | XeGTAO slice formulation, half-res, depth+normal bilateral upsample |
+| **Contact shadows** | short raymarch on the **direct** sun term |
+| **SSR** | binary-search refinement, roughness-aware jitter, env-map fallback |
+| **TAA** | Halton(2,3) jitter, velocity reprojection, YCoCg neighbourhood clipping |
+| **Volumetrics** | raymarched sun shafts, half-res |
+| **Bloom** | soft-knee bright pass into a dual-filter mip chain |
+| **Viewmodel** | own scene at 55° FOV, composited **before** tonemap so it shares the film response |
+| **Tonemap** | AgX + filmic grade: cool shadow lift, warm highlight roll |
 
 Two decisions worth calling out, because both were counter-intuitive and both were
 settled by measurement:
@@ -264,12 +272,7 @@ The method shaped the codebase, so it's documented rather than hidden.
 
 ```mermaid
 flowchart LR
-    A["<b>A · Foundation</b><br/><sub>4 agents</sub><br/>materials · lighting<br/>render · physics"]
-    B["<b>B · Content</b><br/><sub>9 agents</sub><br/>level · player · weapons<br/>ai · fx · audio · hud"]
-    C["<b>C · Critic loop</b><br/><sub>3 rounds × 10</sub><br/>grade → route → fix"]
-    D["<b>D · Consolidate</b><br/><sub>5 agents</sub><br/>recover performance"]
-    E["<b>E · Defects</b><br/><sub>2 agents</sub><br/>targeted repair"]
-    A --> B --> C --> D --> E
+    A["A · Foundation<br/>4 agents"] --> B["B · Content<br/>9 agents"] --> C["C · Critic loop<br/>3 rounds"] --> D["D · Consolidate<br/>5 agents"] --> E["E · Defects<br/>2 agents"]
 ```
 
 Two documents did the coordination, and both are in the repo:
