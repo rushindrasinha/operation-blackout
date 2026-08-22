@@ -1,0 +1,82 @@
+name: Deploy
+
+# Auto-deploy to Cloudflare Pages on every push to main.
+#
+# The deploy is deliberately GATED on the build succeeding and the physics
+# regression test passing. A green deploy that ships a broken simulation is
+# worse than no deploy — this project has already had one bug that left the game
+# rendering at full framerate while bullets silently stopped registering, so
+# "it built" is not evidence that it works.
+#
+# Pull requests get a preview deployment instead of touching production.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:        # lets you re-deploy by hand from the Actions tab
+
+concurrency:
+  # A newer push supersedes an in-flight one; never race two deploys.
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      deployments: write
+      pull-requests: write   # so the preview URL can be commented on a PR
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+
+      - name: Verify the bundle is self-contained
+        # The project's core claim is zero external assets. If a CDN URL or an
+        # asset reference ever sneaks into the bundle, fail here rather than
+        # discovering it when someone loads the site offline.
+        run: |
+          if grep -qEo 'https?://(cdn|unpkg|jsdelivr|fonts\.googleapis)' dist/assets/*.js; then
+            echo "::error::bundle contains an external CDN reference"
+            exit 1
+          fi
+          test -f dist/index.html || { echo "::error::no index.html"; exit 1; }
+          echo "bundle ok: $(du -sh dist | cut -f1)"
+
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Physics regression test
+        # Boots the real game headless, injects NaN into live rigid bodies, and
+        # asserts the simulation survives. Verified to fail against the pre-fix
+        # tree, so it genuinely discriminates.
+        run: |
+          npx vite preview --port 8899 --strictPort &
+          for i in $(seq 1 40); do
+            curl -sf http://127.0.0.1:8899/ >/dev/null && break || sleep 1
+          done
+          BLACKOUT_URL=http://127.0.0.1:8899/ node tools/test-physics-nan.mjs
+
+      - name: Deploy to Cloudflare Pages
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: >-
+            pages deploy dist
+            --project-name operation-blackout
+            --branch ${{ github.head_ref || github.ref_name }}

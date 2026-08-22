@@ -20,9 +20,17 @@
 import { chromium } from 'playwright';
 import { setTimeout as sleep } from 'node:timers/promises';
 
-const URL = 'http://127.0.0.1:5173/';
+// Configurable so CI can point at `vite preview` on any port. Named TARGET, not
+// URL, because `const URL = ...` shadows the global URL constructor — a mistake
+// that already cost one debugging round in this repo.
+const TARGET = process.env.BLACKOUT_URL ?? process.argv[2] ?? 'http://127.0.0.1:5173/';
 const browser = await chromium.launch({
-  args: ['--use-angle=metal', '--ignore-gpu-blocklist', '--use-gl=angle'],
+  // ANGLE's Metal backend only exists on macOS; CI runners are Linux and need
+  // SwiftShader. This test is about the physics solver, not the renderer, so a
+  // software GL backend is entirely adequate there.
+  args: process.platform === 'darwin'
+    ? ['--use-angle=metal', '--ignore-gpu-blocklist', '--use-gl=angle']
+    : ['--use-gl=angle', '--use-angle=swiftshader', '--ignore-gpu-blocklist', '--no-sandbox'],
 });
 const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
 
@@ -30,7 +38,7 @@ const lines = [];
 page.on('console', (m) => lines.push(`[${m.type()}] ${m.text()}`));
 page.on('pageerror', (e) => lines.push(`[pageerror] ${e.message}`));
 
-await page.goto(URL, { waitUntil: 'domcontentloaded' });
+await page.goto(TARGET, { waitUntil: 'domcontentloaded' });
 await page.waitForFunction(() => window.__READY__ === true, { timeout: 60000 });
 await sleep(2500);
 
