@@ -9,17 +9,19 @@ Orientation for a new agent session picking this project up cold. Read this, the
 
 | | |
 |---|---|
-| **Local path** | `/Users/rushindrasinha/threejs-fps` |
-| **Repo** | `https://github.com/rushindrasinha/operation-blackout` (**private**) |
+| **Repo** | `https://github.com/rushindrasinha/operation-blackout` |
 | **Clone** | `gh repo clone rushindrasinha/operation-blackout` |
 | **Branch** | `master` (not `main`) |
 | **Machine** | Apple M4 Pro, Metal 4, macOS. All perf numbers are from this box. |
 
 ```bash
-cd /Users/rushindrasinha/threejs-fps
+gh repo clone rushindrasinha/operation-blackout && cd operation-blackout
 npm install
 npm run dev            # http://localhost:5173 — click Deploy to lock pointer
 ```
+
+(The machine this was built and measured on keeps a working copy at
+`~/threejs-fps`; every performance figure below comes from that box.)
 
 ---
 

@@ -10,7 +10,8 @@
     "preview": "vite preview",
     "shoot": "node tools/shoot.mjs",
     "shoot:all": "for p in spawn overwatch warehouse lane closeup; do node tools/shoot.mjs --out docs/screenshots/$p.png --wait 32000 --pose $p; done",
-    "test:physics": "node tools/test-physics-nan.mjs"
+    "test:physics": "node tools/test-physics-nan.mjs",
+    "deploy": "npm run build && npx wrangler pages deploy dist --project-name operation-blackout"
   },
   "keywords": [
     "threejs",

@@ -1,0 +1,9 @@
+# Cloudflare Pages — static deploy.
+#
+# The whole game is a static bundle: no backend, no API, no database. Cloudflare
+# is the pick over Vercel/Netlify purely on egress — this ships ~1.29 MB gzipped
+# per play, and their 100 GB free tiers cap out around 77k plays. Cloudflare's
+# free bandwidth is unmetered, so a front-page moment costs nothing.
+name = "operation-blackout"
+compatibility_date = "2026-08-22"
+pages_build_output_dir = "dist"

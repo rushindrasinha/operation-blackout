@@ -38,6 +38,9 @@ npm install
 npm run dev          # http://localhost:5173
 ```
 
+**Desktop only.** Needs a keyboard, a mouse, pointer lock and a real GPU. It will load on a
+phone and then be unplayable.
+
 Click **Deploy** to lock the pointer and play. `Esc` releases the cursor.
 
 Requires a WebGL2 browser. Developed and measured on an Apple M4 Pro (Metal 4) in Chrome.
@@ -45,9 +48,31 @@ Requires a WebGL2 browser. Developed and measured on an Apple M4 Pro (Metal 4) i
 ```bash
 npm run build        # production bundle -> dist/
 npm run preview      # serve the built bundle
+npm run deploy       # build + publish to Cloudflare Pages
 npm run shoot        # headless screenshot via Playwright
 npm run test:physics # regression test: NaN injection must not kill the simulation
 ```
+
+### Deploying
+
+The build is a pure static bundle — no backend, no API, no database — so any static host
+works. Verified: the production bundle runs clean off a plain file server with **zero
+external requests**, no COOP/COEP headers, and no `.wasm` MIME configuration (Rapier's
+`compat` build base64-inlines its WebAssembly into the JS chunk).
+
+```bash
+npm run deploy       # Cloudflare Pages via wrangler
+```
+
+Cloudflare Pages is the default here for one reason: this ships **~1.29 MB gzipped per
+play**, and the 100 GB/month free tiers on Vercel and Netlify cap out around 77,000 loads.
+Cloudflare's free bandwidth is unmetered, so being shared widely costs nothing.
+
+For GitHub Pages instead, set `base: '/operation-blackout/'` in `vite.config.js` first, or
+every asset 404s under the repository subpath.
+
+`public/_headers` marks the content-hashed assets immutable for a year and the entry
+document must-revalidate, so returning players never get pinned to a stale build.
 
 ---
 
@@ -334,6 +359,51 @@ useful correction to the intuition that post-processing is where browser rendere
 
 This project was built by a fleet of parallel AI agents coordinated through a written
 contract. That approach is worth documenting because it shaped the codebase.
+
+### The original prompt
+
+The entire project came from a single request, reproduced verbatim:
+
+> I want you to build a first-person shooter at the level of the most recent Call of Duty
+> games. It should be utterly perfect, visually beautiful, with every single thing done at
+> AAA quality—from textures to physics to anything you could think of.
+>
+> Fan out sub-agents and have sub-agents tackle each one individually so that the game is
+> utterly perfect. You should /loop on each item and have a separate sub-agent check it
+> visually to ensure it looks triple A. That separate sub-agent should be a really harsh
+> critic, and if it doesn't look triple A, it should keep going.
+>
+> Don't stop until each sub-agent is utterly wowed with the quality when compared with the
+> actual Call of Duty game. It should literally compare them side by side blind and say
+> which one looks better. Do this in ThreeJS. /loop until it's utterly perfect. Fan out
+> sub-agents and ultracode.
+
+### What was achievable, and what wasn't
+
+Most of that brief was followed closely. Two parts were not, and saying so is more useful
+than pretending otherwise.
+
+**The termination condition could never fire.** "Loop until a critic prefers this over Call
+of Duty in a blind side-by-side" has exactly one outcome: a harsh critic picks the CoD frame
+every time. Modern CoD is ~1,500 people over 3–4 years with a custom engine, photogrammetry
+rigs and mocap stages, streaming hundreds of gigabytes off an NVMe. This is WebGL in a
+browser tab with a few hundred megabytes and zero authored assets. Left as written, the loop
+runs forever and never ships. It was replaced with a bar that can actually be met and
+measured — see [`VISUAL_BAR.md`](VISUAL_BAR.md) — and the critic's question became *"what is
+the single largest remaining gap and what closes it"* rather than *"is this better than CoD"*.
+
+**The critic loop was stopped early, deliberately.** Three rounds scored 4.29 → 4.43 → 4.33.
+It was not converging, it was oscillating — while triangles grew 4.7M → 6.5M and framerate
+fell 82 → 52 fps. The loop had become a machine for trading performance for detail and
+calling it progress. Continuing to "loop until perfect" would have produced a prettier still
+frame and a worse game. It was swapped for a consolidation pass that added no content, which
+recovered 6.5M → 4.4M triangles and 52 → 72 fps, and then a targeted defect pass. Named,
+specific fixes worked; open-ended critique had stopped working.
+
+The honest summary: the result is **6.2/10 against its own rubric**, not parity with Call of
+Duty. What the brief did produce, by aiming far past what was reachable, is probably the
+most complete rendering pipeline anyone has bothered to put in a browser tab with a zero-byte
+asset budget.
 
 ### The contract
 

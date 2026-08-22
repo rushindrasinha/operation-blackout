@@ -1,0 +1,9 @@
+# Asset filenames are content-hashed by Vite, so they can be cached forever.
+/assets/*
+  Cache-Control: public, max-age=31536000, immutable
+
+# The entry document must never be cached, or players get pinned to an old build.
+/
+  Cache-Control: public, max-age=0, must-revalidate
+/index.html
+  Cache-Control: public, max-age=0, must-revalidate
