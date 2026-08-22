@@ -9,6 +9,7 @@ Orientation for a new agent session picking this project up cold. Read this, the
 
 | | |
 |---|---|
+| **Live** | `https://operation-blackout-8xf.pages.dev` (Cloudflare Pages) |
 | **Repo** | `https://github.com/rushindrasinha/operation-blackout` |
 | **Clone** | `gh repo clone rushindrasinha/operation-blackout` |
 | **Branch** | `master` (not `main`) |
@@ -37,6 +38,8 @@ Complete and playable. Three commits. Nothing in flight, no half-finished work.
 - Audit clean: no secrets, 0 TODOs, 0 `debugger`, 1 `console.log`, build passes
 - `npm run test:physics` guards the one bug that ever killed a live session (see `CHANGELOG.md` 1.0.1)
 - Verified self-contained: cloned fresh, `npm ci`, built, and ran at 64 fps
+- Deployed to Cloudflare Pages via `npm run deploy` (needs `npx wrangler login` once).
+  Live measurement: 8.5 s to playable, 66 fps, 1.22 MB transferred with Brotli.
 
 ---
 

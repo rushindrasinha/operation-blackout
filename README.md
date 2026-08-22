@@ -14,6 +14,10 @@ No images. No models. No audio files. No CDN. It boots with the network unplugge
 [![FPS](https://img.shields.io/badge/1080p-59--72%20fps-success?style=flat-square)](#performance)
 [![License](https://img.shields.io/badge/license-MIT-blue?style=flat-square)](LICENSE)
 
+### **[▶  PLAY IT IN YOUR BROWSER](https://operation-blackout-8xf.pages.dev)**
+
+<sub>No install, no login. ~8s first load while it synthesises every texture. Desktop only.</sub>
+
 ![Operation Blackout](docs/screenshots/spawn.jpg)
 
 **[▶ Watch 15s of gameplay](docs/demo.mp4)**
@@ -23,6 +27,10 @@ No images. No models. No audio files. No CDN. It boots with the network unplugge
 ---
 
 ## ▸ Play it
+
+**Live: [operation-blackout-8xf.pages.dev](https://operation-blackout-8xf.pages.dev)** — nothing to install.
+
+Or run it locally:
 
 ```bash
 git clone https://github.com/rushindrasinha/operation-blackout
