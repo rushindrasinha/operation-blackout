@@ -16,6 +16,8 @@ No images. No models. No audio files. No CDN. It boots with the network unplugge
 
 ![Operation Blackout](docs/screenshots/spawn.jpg)
 
+**[▶ Watch 15s of gameplay](docs/demo.mp4)**
+
 </div>
 
 ---
@@ -457,8 +459,16 @@ npm run dev            # dev server
 npm run build          # production bundle → dist/
 npm run deploy         # build + publish to Cloudflare Pages
 npm run shoot          # headless screenshot
+npm run demo           # record a 15s gameplay reel -> docs/demo.mp4
 npm run test:physics   # regression test: NaN must not kill the simulation
 ```
+
+**Recording the demo reel.** `tools/record-demo.mjs` synthesises input state
+(`ctx.input` keys, buttons and mouse deltas) rather than scripting a camera path, so the
+footage runs through the real movement, weapon and animation code. Because CDP screencast
+caps out near 18 frames/sec regardless of engine speed, game time is scaled down while
+recording and ffmpeg speeds it back up — yielding ~45 fps of finished video from an
+18 fps capture.
 
 **Screenshots.** `node tools/shoot.mjs --out shot.png --pose warehouse`
 Poses: `spawn` `overwatch` `warehouse` `lane` `closeup`. The harness starts a private cold

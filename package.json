@@ -11,7 +11,8 @@
     "shoot": "node tools/shoot.mjs",
     "shoot:all": "for p in spawn overwatch warehouse lane closeup; do node tools/shoot.mjs --out docs/screenshots/$p.png --wait 32000 --pose $p; done",
     "test:physics": "node tools/test-physics-nan.mjs",
-    "deploy": "npm run build && npx wrangler pages deploy dist --project-name operation-blackout"
+    "deploy": "npm run build && npx wrangler pages deploy dist --project-name operation-blackout",
+    "demo": "node tools/record-demo.mjs --seconds 15 --w 1920 --h 1080 --slowmo 4"
   },
   "keywords": [
     "threejs",
