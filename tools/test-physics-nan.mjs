@@ -30,7 +30,7 @@ const browser = await chromium.launch({
   // software GL backend is entirely adequate there.
   args: process.platform === 'darwin'
     ? ['--use-angle=metal', '--ignore-gpu-blocklist', '--use-gl=angle']
-    : ['--use-gl=angle', '--use-angle=swiftshader', '--ignore-gpu-blocklist', '--no-sandbox'],
+    : ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist', '--no-sandbox'],
 });
 const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
 
@@ -39,7 +39,14 @@ page.on('console', (m) => lines.push(`[${m.type()}] ${m.text()}`));
 page.on('pageerror', (e) => lines.push(`[pageerror] ${e.message}`));
 
 await page.goto(TARGET, { waitUntil: 'domcontentloaded' });
-await page.waitForFunction(() => window.__READY__ === true, { timeout: 60000 });
+// waitForFunction(fn, arg, options): options is the THIRD argument. Passing it
+// second silently fell back to the 30s default, which a software-GL CI boot can exceed.
+try {
+  await page.waitForFunction(() => window.__READY__ === true, null, { timeout: 120000 });
+} catch (err) {
+  console.error('Game never reported __READY__. Page log:\n' + lines.slice(-40).join('\n'));
+  throw err;
+}
 await sleep(2500);
 
 const result = await page.evaluate(async () => {
