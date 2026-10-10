@@ -25,6 +25,9 @@ concurrency:
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
+    env:
+      # A step's own env is not visible to its if:, so the flag lives at job level.
+      CF_TOKEN_SET: ${{ secrets.CLOUDFLARE_API_TOKEN != '' }}
     timeout-minutes: 20
     permissions:
       contents: read
@@ -72,6 +75,10 @@ jobs:
           BLACKOUT_URL=http://127.0.0.1:8899/ node tools/test-physics-nan.mjs
 
       - name: Deploy to Cloudflare Pages
+        # Only deploy when the token is configured. Build + physics test above
+        # are the real gate; a missing deploy credential should not paint the
+        # whole run red.
+        if: ${{ env.CF_TOKEN_SET == 'true' }}
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}

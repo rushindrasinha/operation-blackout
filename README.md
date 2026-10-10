@@ -13,6 +13,9 @@ No images. No models. No audio files. No CDN. It boots with the network unplugge
 [![Assets](https://img.shields.io/badge/external%20assets-0%20bytes-success?style=flat-square)](#zero-assets)
 [![FPS](https://img.shields.io/badge/1080p-59--72%20fps-success?style=flat-square)](#performance)
 [![License](https://img.shields.io/badge/license-MIT-blue?style=flat-square)](LICENSE)
+[![Built with Claude](https://img.shields.io/badge/built%20with-Claude%20Opus%205%20in%20Claude%20Code-D97757?style=flat-square)](https://claude.com/claude-code)
+
+**Built with Claude Opus 5 in Claude Code.** One prompt wrote the build contract; 11 parallel agents, a critic loop and a consolidation pass did the rest.
 
 ### **[▶  PLAY IT IN YOUR BROWSER](https://operation-blackout-8xf.pages.dev)**
 
@@ -514,7 +517,7 @@ unmetered. For GitHub Pages instead, set `base: '/operation-blackout/'` in
 
 <div align="center">
 
-**[MIT](LICENSE)** · Built with [Three.js](https://threejs.org) and [Rapier](https://rapier.rs)
+**[MIT](LICENSE)** · Built with [Claude Opus 5](https://claude.com) in [Claude Code](https://claude.com/claude-code), [Three.js](https://threejs.org) and [Rapier](https://rapier.rs)
 
 <sub>Read <a href="ARCHITECTURE.md">ARCHITECTURE.md</a> before writing code ·
 <a href="CHANGELOG.md">CHANGELOG.md</a> records root causes with measurements</sub>

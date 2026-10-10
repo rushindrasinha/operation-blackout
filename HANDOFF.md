@@ -12,7 +12,7 @@ Orientation for a new agent session picking this project up cold. Read this, the
 | **Live** | `https://operation-blackout-8xf.pages.dev` (Cloudflare Pages) |
 | **Repo** | `https://github.com/rushindrasinha/operation-blackout` |
 | **Clone** | `gh repo clone rushindrasinha/operation-blackout` |
-| **Branch** | `master` (not `main`) |
+| **Branch** | `main` |
 | **Machine** | Apple M4 Pro, Metal 4, macOS. All perf numbers are from this box. |
 
 ```bash
@@ -28,7 +28,7 @@ npm run dev            # http://localhost:5173 — click Deploy to lock pointer
 
 ## State as of handoff
 
-Complete and playable. Three commits. Nothing in flight, no half-finished work.
+Complete and playable. Eleven commits on `main`. Nothing in flight, no half-finished work.
 
 - **~44,000 lines**, 11 systems, 2 runtime dependencies (`three` r185, `@dimforge/rapier3d-compat`)
 - **59–72 fps** at 1920×1080 on a quiet machine, ~350 draw calls, 4.4M triangles
